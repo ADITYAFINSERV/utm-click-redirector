@@ -1,10 +1,12 @@
 import express from "express";
-import { randomUUID } from "crypto";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Healthcheck endpoint for Render
+// Simple counter in memory
+let counter = 1;
+
+// Healthcheck (Render needs this)
 app.get("/healthz", (_req, res) => res.send("ok"));
 
 app.get(["/", "/r", "/redirect"], (req, res) => {
@@ -14,14 +16,16 @@ app.get(["/", "/r", "/redirect"], (req, res) => {
   const u = new URL(dest);
   const sp = u.searchParams;
 
-  // Generate unique click_id
-  const clickId = randomUUID();
+  // Click prefix (e.g., rakesh) from env
+  const base = process.env.CLICK_PREFIX || "rakesh";
 
-  // Always set click_id
+  // Build sequential ID like rakesh01, rakesh02 ...
+  const clickId = `${base}${String(counter).padStart(2, "0")}`;
+  counter++;
+
+  // Apply to URL
   sp.set("click_id", clickId);
-
-  // Replace utm_campaign with click_id for tracking
-  sp.set("utm_campaign", `utmclick_${clickId}`);
+  sp.set("utm_campaign", clickId);
 
   console.log({
     ts: new Date().toISOString(),
