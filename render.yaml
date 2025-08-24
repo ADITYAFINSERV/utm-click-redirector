@@ -14,3 +14,5 @@ services:
       - key: DESTINATION_URL
         value: "https://www.idfcfirstbank.com/credit-card/ntb-diy/apply?utm_source=Partner&utm_medium=Cards_Hub&utm_campaign=NTB_Cards_Hub_Rakesh01"
         sync: false
+      - key: CLICK_PREFIX
+        value: "rakesh"
