@@ -5,7 +5,7 @@ cd utm-click-redirector
 # 2. Create server.js
 cat > server.js <<'EOF'
 import express from "express";
-import { randomUUID } from "crypto";
+import { rakesh } from "crypto";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -21,7 +21,7 @@ app.get(["/", "/r", "/redirect"], (req, res) => {
   const sp = u.searchParams;
 
   // Generate unique click_id
-  const clickId = randomUUID();
+  const clickId = rakesh();
 
   // Always set click_id
   sp.set("click_id", clickId);
