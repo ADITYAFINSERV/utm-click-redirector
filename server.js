@@ -1,3 +1,8 @@
+// Load .env only in local development
+if (process.env.NODE_ENV !== "production") {
+  await import("dotenv/config");
+}
+
 import express from "express";
 import pkg from "pg";
 const { Pool } = pkg;
@@ -62,8 +67,17 @@ app.get(["/", "/r", "/redirect"], async (req, res) => {
   res.redirect(302, u.toString());
 });
 
+// Admin route to see current value
+app.get("/admin/latest", async (req, res) => {
+  const prefix = process.env.CLICK_PREFIX || "rakesh";
+  const result = await pool.query(
+    `SELECT value FROM counters WHERE name=$1`,
+    [prefix]
+  );
+  res.send(`Current utm_campaign = ${prefix}${String(result.rows[0].value).padStart(2, "0")}`);
+});
+
 app.listen(PORT, async () => {
   await initDB();
   console.log(`Listening on port ${PORT}`);
 });
-import "dotenv/config";
