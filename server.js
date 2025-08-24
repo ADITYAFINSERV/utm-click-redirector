@@ -66,3 +66,4 @@ app.listen(PORT, async () => {
   await initDB();
   console.log(`Listening on port ${PORT}`);
 });
+import "dotenv/config";
