@@ -1,0 +1,85 @@
+# 1. Clone your empty GitHub repo (replace USERNAME and REPO)
+git clone https://github.com/USERNAME/utm-click-redirector.git
+cd utm-click-redirector
+
+# 2. Create server.js
+cat > server.js <<'EOF'
+import express from "express";
+import { randomUUID } from "crypto";
+
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+// Healthcheck endpoint for Render
+app.get("/healthz", (_req, res) => res.send("ok"));
+
+app.get(["/", "/r", "/redirect"], (req, res) => {
+  const dest = process.env.DESTINATION_URL;
+  if (!dest) return res.status(500).send("DESTINATION_URL not set");
+
+  const u = new URL(dest);
+  const sp = u.searchParams;
+
+  // Generate unique click_id
+  const clickId = randomUUID();
+
+  // Always set click_id
+  sp.set("click_id", clickId);
+
+  // Replace utm_campaign with click_id for tracking
+  sp.set("utm_campaign"Rakesh01{clickId}`);
+
+  console.log({
+    ts: new Date().toISOString(),
+    click_id: clickId,
+    ip: req.headers["x-forwarded-for"] || req.ip,
+    ua: req.headers["user-agent"]
+  });
+
+  res.redirect(302, u.toString());
+});
+
+app.listen(PORT, () => {
+  console.log(`Listening on port ${PORT}`);
+});
+EOF
+
+# 3. Create package.json
+cat > package.json <<'EOF'
+{
+  "name": "utm-click-redirector",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
+EOF
+
+# 4. Create render.yaml
+cat > render.yaml <<'EOF'
+services:
+  - type: web
+    name: utm-click-redirector
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    healthCheckPath: "/healthz"
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: DESTINATION_URL
+        value: "https://www.idfcfirstbank.com/credit-card/ntb-diy/apply?utm_source=Partner&utm_medium=Cards_Hub&utm_campaign=NTB_Cards_Hub_Rakesh01"
+        sync: false
+EOF
+
+# 5. Commit and push
+git add .
+git commit -m "Deployable redirector with unique click_id"
+git push origin main
