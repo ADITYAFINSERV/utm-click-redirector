@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: utm-click-redirector
+    env: node
+    plan: free
+    region: frankfurt
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    healthCheckPath: "/healthz"
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: DESTINATION_URL
+        value: "https://www.idfcfirstbank.com/credit-card/ntb-diy/apply?utm_source=Partner&utm_medium=Cards_Hub&utm_campaign=NTB_Cards_Hub_Rakesh01"
+        sync: false
