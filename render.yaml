@@ -3,16 +3,18 @@ services:
     name: utm-click-redirector
     env: node
     plan: free
-    region: frankfurt
     buildCommand: "npm install"
-    startCommand: "npm start"
-    healthCheckPath: "/healthz"
-    autoDeploy: true
+    startCommand: "node server.js"
     envVars:
-      - key: NODE_VERSION
-        value: 18
+      - key: DATABASE_URL
+        fromDatabase:
+          name: utm-click-db
+          property: connectionString
       - key: DESTINATION_URL
-        value: "https://www.idfcfirstbank.com/credit-card/ntb-diy/apply?utm_source=Partner&utm_medium=Cards_Hub&utm_campaign=NTB_Cards_Hub_Rakesh01"
-        sync: false
+        value: "https://www.idfcfirstbank.com/credit-card/ntb-diy/apply?utm_source=Partner&utm_medium=Cards_Hub"
       - key: CLICK_PREFIX
         value: "rakesh"
+
+databases:
+  - name: utm-click-db
+    plan: free
