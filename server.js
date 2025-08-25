@@ -10,29 +10,52 @@ const { Pool } = pkg;
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Postgres connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
-});
+// Destination URL
+const dest = process.env.DESTINATION_URL;
+if (!dest) {
+  console.error("❌ DESTINATION_URL is not set. Exiting...");
+  process.exit(1);
+}
+
+// Postgres connection (optional)
+let pool;
+let dbAvailable = true;
+
+try {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+  });
+} catch (err) {
+  console.warn("⚠️ Database not configured, will run without DB:", err.message);
+  dbAvailable = false;
+}
 
 // Initialize DB
 async function initDB() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS counters (
-      id SERIAL PRIMARY KEY,
-      name TEXT UNIQUE,
-      value INTEGER
-    )
-  `);
+  if (!dbAvailable) return;
 
-  const prefix = process.env.CLICK_PREFIX || "rakesh";
-  await pool.query(
-    `INSERT INTO counters (name, value)
-     VALUES ($1, 0)
-     ON CONFLICT (name) DO NOTHING`,
-    [prefix]
-  );
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS counters (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE,
+        value INTEGER
+      )
+    `);
+
+    const prefix = process.env.CLICK_PREFIX || "rakesh";
+    await pool.query(
+      `INSERT INTO counters (name, value)
+       VALUES ($1, 0)
+       ON CONFLICT (name) DO NOTHING`,
+      [prefix]
+    );
+    console.log("✅ Database initialized");
+  } catch (err) {
+    console.error("❌ Database init failed:", err.message);
+    dbAvailable = false;
+  }
 }
 
 // Health check
@@ -40,21 +63,28 @@ app.get("/healthz", (_req, res) => res.send("ok"));
 
 // Redirect endpoint
 app.get(["/", "/r", "/redirect"], async (req, res) => {
-  const dest = process.env.DESTINATION_URL;
-  if (!dest) return res.status(500).send("DESTINATION_URL not set");
-
   const prefix = process.env.CLICK_PREFIX || "rakesh";
+  let campaign;
 
-  // Increment counter atomically
-  const result = await pool.query(
-    `UPDATE counters SET value = value + 1 WHERE name=$1 RETURNING value`,
-    [prefix]
-  );
+  if (dbAvailable) {
+    try {
+      const result = await pool.query(
+        `UPDATE counters SET value = value + 1 WHERE name=$1 RETURNING value`,
+        [prefix]
+      );
+      const count = result.rows[0].value;
+      campaign = `${prefix}${String(count).padStart(2, "0")}`;
+    } catch (err) {
+      console.error("⚠️ DB error, falling back:", err.message);
+      dbAvailable = false;
+    }
+  }
 
-  const count = result.rows[0].value;
-  const campaign = `${prefix}${String(count).padStart(2, "0")}`;
+  // If DB not available, fallback to timestamp-based unique ID
+  if (!campaign) {
+    campaign = `${prefix}${Date.now()}`;
+  }
 
-  // Append utm_campaign
   const u = new URL(dest);
   u.searchParams.set("utm_campaign", campaign);
 
@@ -68,18 +98,28 @@ app.get(["/", "/r", "/redirect"], async (req, res) => {
   res.redirect(302, u.toString());
 });
 
-// Admin route (see latest campaign number)
+// Admin route
 app.get("/admin/latest", async (_req, res) => {
+  if (!dbAvailable) {
+    return res.send("⚠️ DB not available. No counters stored.");
+  }
+
   const prefix = process.env.CLICK_PREFIX || "rakesh";
-  const result = await pool.query(
-    `SELECT value FROM counters WHERE name=$1`,
-    [prefix]
-  );
-  res.send(`Current utm_campaign = ${prefix}${String(result.rows[0].value).padStart(2, "0")}`);
+  try {
+    const result = await pool.query(
+      `SELECT value FROM counters WHERE name=$1`,
+      [prefix]
+    );
+    return res.send(
+      `Current utm_campaign = ${prefix}${String(result.rows[0].value).padStart(2, "0")}`
+    );
+  } catch (err) {
+    return res.send("⚠️ Error fetching counter: " + err.message);
+  }
 });
 
 // Start server
 app.listen(PORT, async () => {
   await initDB();
-  console.log(`Listening on port ${PORT}`);
+  console.log(`🚀 Listening on port ${PORT}`);
 });
