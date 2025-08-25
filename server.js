@@ -83,17 +83,3 @@ app.listen(PORT, async () => {
   await initDB();
   console.log(`Listening on port ${PORT}`);
 });
-{
-  "name": "utm-click-redirector",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "pg": "^8.11.5",
-    "dotenv": "^16.4.5"
-  },
-  "license": "UNLICENSED"
-}
