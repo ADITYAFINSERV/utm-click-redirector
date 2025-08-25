@@ -58,6 +58,9 @@ async function initDB() {
   }
 }
 
+// Fallback counter (in-memory)
+let fallbackCounter = 0;
+
 // Health check
 app.get("/healthz", (_req, res) => res.send("ok"));
 
@@ -75,14 +78,15 @@ app.get(["/", "/r", "/redirect"], async (req, res) => {
       const count = result.rows[0].value;
       campaign = `${prefix}${String(count).padStart(2, "0")}`;
     } catch (err) {
-      console.error("⚠️ DB error, falling back:", err.message);
+      console.error("⚠️ DB error, switching to fallback:", err.message);
       dbAvailable = false;
     }
   }
 
-  // If DB not available, fallback to timestamp-based unique ID
+  // Fallback mode → use local counter
   if (!campaign) {
-    campaign = `${prefix}${Date.now()}`;
+    fallbackCounter++;
+    campaign = `${prefix}${String(fallbackCounter).padStart(2, "0")}`;
   }
 
   const u = new URL(dest);
@@ -100,21 +104,24 @@ app.get(["/", "/r", "/redirect"], async (req, res) => {
 
 // Admin route
 app.get("/admin/latest", async (_req, res) => {
-  if (!dbAvailable) {
-    return res.send("⚠️ DB not available. No counters stored.");
-  }
-
   const prefix = process.env.CLICK_PREFIX || "rakesh";
-  try {
-    const result = await pool.query(
-      `SELECT value FROM counters WHERE name=$1`,
-      [prefix]
-    );
+
+  if (dbAvailable) {
+    try {
+      const result = await pool.query(
+        `SELECT value FROM counters WHERE name=$1`,
+        [prefix]
+      );
+      return res.send(
+        `Current utm_campaign = ${prefix}${String(result.rows[0].value).padStart(2, "0")}`
+      );
+    } catch (err) {
+      return res.send("⚠️ Error fetching counter: " + err.message);
+    }
+  } else {
     return res.send(
-      `Current utm_campaign = ${prefix}${String(result.rows[0].value).padStart(2, "0")}`
+      `⚠️ DB not available. Current fallback utm_campaign = ${prefix}${String(fallbackCounter).padStart(2, "0")}`
     );
-  } catch (err) {
-    return res.send("⚠️ Error fetching counter: " + err.message);
   }
 });
 
